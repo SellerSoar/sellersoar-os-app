@@ -90,6 +90,16 @@ th{background:var(--ink);color:var(--refract);text-align:left;font-size:12px;pad
 td{padding:6px 8px;border-top:1px solid var(--grey-200);vertical-align:top;font-size:13px}
 .tw{overflow-x:auto}
 .empty{color:var(--grey-600);padding:20px;text-align:center}
+.runs{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 14px}
+.rchip{font-size:12px;border-radius:999px;padding:3px 10px;background:var(--grey-200);color:var(--grey-600);font-weight:700}
+.rchip.done,.rchip.review{background:#DDF1E9;color:var(--gain)}.rchip.failed{background:#FBE3E8;color:var(--loss)}.rchip.running{background:var(--plume-100);color:var(--plume-700)}
+.banner{border-radius:10px;padding:10px 12px;margin:0 0 12px;font-weight:600}
+.banner.bad{background:#FBE3E8;color:var(--loss)}.banner.ok{background:#DDF1E9;color:var(--gain)}.banner.warn{background:#FFF1D6;color:var(--warn)}
+details.prod{background:var(--grey-100);border:1px solid var(--grey-200);border-radius:10px;padding:8px 12px;margin-bottom:8px}
+details.prod summary{cursor:pointer;font-weight:700}
+.kn{border-left:3px solid var(--plume-300);padding:4px 10px;margin:6px 0;background:var(--grey-100);border-radius:0 8px 8px 0}
+.kn .k{font-size:11px;font-weight:800;text-transform:uppercase;color:var(--plume-700)}
+.spark{vertical-align:middle}
 @media (max-width:760px){main{padding:12px}.board{grid-template-columns:repeat(5,82vw)}.vbtns{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
@@ -119,6 +129,7 @@ td{padding:6px 8px;border-top:1px solid var(--grey-200);vertical-align:top;font-
     <div class="logo">Seller<span>Soar</span> OS</div>
     <select id="brand"></select>
     <nav id="nav">
+      <button data-v="brain">Brain</button>
       <button data-v="board" class="on">Work</button>
       <button data-v="health">Listing health</button>
       <button data-v="decisions">Decisions</button>
@@ -188,7 +199,7 @@ async function start() {
   setInterval(() => { if ($("#drawer").classList.contains("hidden") && S.view === "board") render(); }, 30000);
 }
 
-function render() { ({board, health, decisions, activity})[S.view](); }
+function render() { ({brain, board, health, decisions, activity})[S.view](); }
 
 // ------------------------------------------------------------------ board
 async function board() {
@@ -314,6 +325,84 @@ async function health() {
       <td>${r.hard?.length ? `<b>${esc(r.hard.join("; "))}</b>` : esc(f.map(([k,v]) => `${k} ${v[2]}`).join("; ") || "clean")}</td></tr>`; }).join("")}</table></div>`;
   document.querySelectorAll(".tile").forEach(t => t.onclick = () => { S.market = S.market === t.dataset.m ? null : t.dataset.m; health(); });
   if ($("#clr")) $("#clr").onclick = e => { e.preventDefault(); S.market = null; health(); };
+}
+
+
+// ------------------------------------------------------------------ brain: the brand's memory
+function spark(vals) {
+  if (!vals.length) return "";
+  const w = 90, h = 22, mn = Math.min(...vals, 40), mx = Math.max(...vals, 100);
+  const pts = vals.map((v, i) => `${vals.length === 1 ? w/2 : i * w / (vals.length - 1)},${h - (v - mn) / (mx - mn || 1) * h}`).join(" ");
+  return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline fill="none" stroke="var(--plume-600)" stroke-width="2" points="${pts}"/></svg>`;
+}
+async function brain() {
+  const b = S.brand;
+  const [{data:cfgs},{data:runs},{data:mk},{data:prods},{data:cat},{data:dec},{data:kn},{data:open}] = await Promise.all([
+    SB.from("os_brand_config").select("id,version,note,created_by,created_at,approved_by,approved_at").eq("brand_id", b).order("version",{ascending:false}),
+    SB.from("os_runs").select("*").eq("brand_id", b).eq("kind","listing_health").order("run_date",{ascending:false}).order("created_at",{ascending:false}).limit(30),
+    SB.from("os_brand_markets").select("*").eq("brand_id", b),
+    SB.from("os_products").select("*").eq("brand_id", b),
+    SB.from("os_catalog").select("*").eq("brand_id", b),
+    SB.from("os_decisions").select("*").eq("brand_id", b).is("superseded_by", null).order("decided_at",{ascending:false}),
+    SB.from("os_knowledge").select("*").eq("brand_id", b).is("superseded_by", null).order("created_at",{ascending:false}).limit(100),
+    SB.from("os_tasks").select("id,ref,title,status,evidence,markets").eq("brand_id", b).not("status","in","(done,dismissed)")]);
+  const runIds = (runs||[]).map(r => r.id);
+  const {data:sc} = runIds.length ? await SB.from("os_market_scores").select("run_id,market,score,grade").in("run_id", runIds) : {data:[]};
+  const order = ["UK","DE","FR","IT","ES","NL","BE","SE","PL","IE","US","CA"];
+  const runDate = Object.fromEntries((runs||[]).map(r => [r.id, r.run_date + r.created_at]));
+  const byMarket = {};
+  (sc||[]).sort((a,b) => runDate[a.run_id] < runDate[b.run_id] ? -1 : 1).forEach(s => (byMarket[s.market] = byMarket[s.market] || []).push(s));
+  const daily = (runs||[]).filter(r => r.cadence);
+  const last = daily[0];
+  const hrs = last?.finished_at ? (Date.now() - new Date(last.finished_at)) / 36e5 : null;
+  const health = !daily.length ? `<div class="banner warn">The daily cloud run has not run for this brand yet.</div>`
+    : last.status === "failed" ? `<div class="banner bad">Last daily run failed (${esc(last.run_date)}): ${esc((last.error||"").slice(0,160))}</div>`
+    : last.status === "running" ? `<div class="banner warn">A daily run is in progress (started ${fmtT(last.started_at)}).</div>`
+    : hrs > 26 ? `<div class="banner bad">No finished daily run for ${Math.round(hrs)} hours.</div>`
+    : `<div class="banner ok">Daily run finished ${fmtT(last.finished_at)} · ${esc(last.summary?.mode||"")} · ${last.summary?.read_today ?? 0} pages read · ${last.summary?.new_tasks ?? 0} new tasks · ${last.summary?.confirmed_fixed ?? 0} fixes confirmed</div>`;
+  const cfg = (cfgs||[])[0];
+  const human = S.me.kind === "human";
+  const cfgBox = cfg ? `<div class="box"><h4>Audit config</h4><div>Version ${cfg.version}: ${esc(cfg.note)}</div>
+    ${cfg.approved_by ? `<div class="sub" style="margin:4px 0 0">Approved by ${who(cfg.approved_by)} · ${fmtT(cfg.approved_at)}</div>`
+      : `<div class="rec">Not approved yet: the daily run uses it but flags every run until a person approves it.${human?` <button class="btn small primary" id="apcfg">Approve version ${cfg.version}</button>`:""}</div>`}</div>` : "";
+  const latestScore = m => { const a = byMarket[m] || []; return a[a.length-1]; };
+  const mrows = (mk||[]).sort((a,b) => order.indexOf(a.market) - order.indexOf(b.market)).map(m => { const s = latestScore(m.market);
+    return `<tr><td><b>${m.market}</b></td><td>${esc(m.status)}</td><td>${m.automation?"daily":"off"}</td><td>${s?s.score:"-"}</td><td>${s?`<span class="g g${s.grade}">${s.grade}</span>`:""}</td><td>${spark((byMarket[m.market]||[]).map(x => +x.score))}</td>
+    <td>${(open||[]).filter(t => (t.markets||[]).includes(m.market)).length}</td></tr>`; }).join("");
+  const openFor = asin => (open||[]).filter(t => (t.evidence||[]).some(e => String(e).includes(asin))).map(t => t.ref).join(", ");
+  const prodHtml = (prods||[]).sort((a,b) => (b.members.length - a.members.length) || a.name.localeCompare(b.name)).map(p => {
+    const ls = (cat||[]).filter(c => p.members.includes(c.asin)).sort((a,b) => order.indexOf(a.market) - order.indexOf(b.market));
+    if (!ls.length) return "";
+    const pd = (dec||[]).filter(d => d.product_key === p.key || (d.asins||[]).some(a => p.members.includes(a)));
+    const pk = (kn||[]).filter(k => k.product_key === p.key || p.members.includes(k.asin));
+    return `<details class="prod"><summary>${esc(p.name)} · ${ls.length} listings in ${new Set(ls.map(x=>x.market)).size} markets</summary>
+      <div class="tw" style="margin-top:8px"><table><tr><th>Mkt</th><th>ASIN</th><th>Label</th><th>Rule</th><th>Score</th><th>Grade</th><th>Seen</th><th>Open tasks</th></tr>
+      ${ls.map(c => `<tr><td>${c.market}</td><td>${c.asin}</td><td>${esc(c.label||"")}</td><td>${esc(c.rule||"")}</td><td>${c.last_score??""}</td><td>${c.last_grade?`<span class="g g${c.last_grade}">${c.last_grade}</span>`:""}</td><td style="font-size:12px">${fmtD(c.first_seen)} → ${fmtD(c.last_seen)}</td><td>${openFor(c.asin)}</td></tr>`).join("")}</table></div>
+      ${pd.map(d => `<div class="kn"><span class="k">decision</span> ${esc(d.decision)} <span class="sub">${esc(d.reason)}</span></div>`).join("")}
+      ${pk.map(k => `<div class="kn"><span class="k">${esc(k.kind)}</span> ${esc(k.title)} <span class="sub">${esc(k.body||"")}</span></div>`).join("")}</details>`; }).join("");
+  $("#view").innerHTML = `<h2>${esc(b)} brain</h2><p class="sub">Everything the system knows about this brand, by market, product and listing. Nothing here is ever deleted.</p>
+    ${health}
+    <div class="runs">${daily.slice(0,14).reverse().map(r => `<span class="rchip ${r.status}" title="${esc(r.title)}">${esc(r.run_date.slice(5))} ${esc(r.status)}</span>`).join("") || `<span class="sub">No daily runs yet.</span>`}</div>
+    ${cfgBox}
+    <h3 style="margin:14px 0 6px">Markets</h3><div class="tw"><table><tr><th>Market</th><th>Status</th><th>Audit</th><th>Score</th><th>Grade</th><th>Trend</th><th>Open tasks</th></tr>${mrows}</table></div>
+    <h3 style="margin:16px 0 6px">Products and listings</h3>${prodHtml || `<div class="empty">No products yet.</div>`}
+    <div class="cols" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-top:10px">
+      <div><h3 style="margin:6px 0">Decisions</h3>${(dec||[]).map(d => `<div class="kn"><span class="k">${esc(d.kind||"decision")}${d.market?` · ${d.market}`:""}</span> <b>${esc(d.topic)}</b>: ${esc(d.decision)}<div class="sub" style="margin:2px 0 0">${esc(d.reason)} · ${who(d.decided_by)} · ${fmtD(d.decided_at.slice(0,10))}${d.recheck_on?` · recheck ${fmtD(d.recheck_on)}`:""}</div></div>`).join("") || `<div class="empty">None yet.</div>`}</div>
+      <div><h3 style="margin:6px 0">Learnings</h3>
+        ${human ? `<div class="box"><div class="row"><select class="f" id="kmk" style="width:auto"><option value="">All markets</option>${(mk||[]).map(m => `<option>${m.market}</option>`).join("")}</select><input type="text" id="kasin" placeholder="ASIN (optional)" style="width:150px"></div>
+          <input type="text" id="kt" placeholder="What did we learn? (one line)" style="margin-top:6px"><textarea id="kb" rows="2" placeholder="Detail and evidence" style="margin-top:6px"></textarea>
+          <div style="margin-top:6px"><button class="btn small primary" id="kadd">Add learning</button> <span class="err" id="kerr"></span></div></div>` : ""}
+        ${(kn||[]).map(k => `<div class="kn"><span class="k">${esc(k.kind)}${k.market?` · ${k.market}`:""}${k.asin?` · ${k.asin}`:""}</span> <b>${esc(k.title)}</b><div class="sub" style="margin:2px 0 0">${esc(k.body||"")} · ${who(k.created_by)} · ${fmtT(k.created_at)}</div></div>`).join("") || `<div class="empty">No learnings yet. Agents write them when a fix is confirmed and 14 days after.</div>`}</div></div>`;
+  if ($("#apcfg")) $("#apcfg").onclick = async () => {
+    const {data, error} = await SB.from("os_brand_config").update({approved_by: S.me.id}).eq("id", cfg.id).select("id");
+    if (error || !data?.length) return alert(error?.message || "Not saved");
+    await SB.from("os_events").insert({brand_id:b, actor:S.me.id, kind:"decision", body:`Approved audit config version ${cfg.version}.`});
+    brain(); };
+  if ($("#kadd")) $("#kadd").onclick = async () => {
+    const title = $("#kt").value.trim(); if (title.length < 5) return $("#kerr").textContent = "Write the learning in one line.";
+    const {error} = await SB.from("os_knowledge").insert({brand_id:b, kind:"note", title, body:$("#kb").value.trim()||null,
+      market:$("#kmk").value||null, asin:$("#kasin").value.trim()||null, created_by:S.me.id});
+    if (error) return $("#kerr").textContent = error.message; brain(); };
 }
 
 // ------------------------------------------------------------------ decisions and activity

@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SellerSoar OS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+:root{--ink:#0E0A1E;--plume:#8D4CFF;--refract:#F6F5FC;--ink-900:#18142B;--ink-800:#231E38;--ink-700:#342E4C;
+--plume-700:#5A2BC4;--plume-600:#7338F0;--plume-300:#B89CFF;--plume-100:#ECE4FF;
+--grey-600:#5E5A70;--grey-400:#9D9AAD;--grey-300:#C8C6D3;--grey-200:#E3E1EA;--grey-100:#EEEDF4;
+--gain:#177A5D;--loss:#C23A53;--warn:#9A6414;--gain-ink:#5FD3A6}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--refract);color:var(--ink);font-family:Manrope,-apple-system,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.45}
+button,input,select,textarea{font:inherit}
+a{color:var(--plume-600)}
+.hidden{display:none!important}
+/* login */
+#login{min-height:100vh;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 85% 110%,rgba(141,76,255,.35),transparent 45%),var(--ink);padding:16px}
+.login-card{background:var(--ink-900);border:1px solid var(--ink-700);border-radius:14px;padding:28px;width:100%;max-width:380px;color:var(--refract)}
+.login-card h1{margin:0 0 4px;font-size:22px}.login-card p{margin:0 0 18px;color:var(--grey-400);font-size:13px}
+.login-card label{display:block;font-size:12px;color:var(--grey-400);margin:10px 0 4px}
+.login-card input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--ink-700);background:var(--ink-800);color:var(--refract)}
+.btn{border:0;border-radius:8px;padding:9px 14px;font-weight:700;cursor:pointer;background:var(--grey-200);color:var(--ink)}
+.btn.primary{background:var(--plume-600);color:var(--refract)}
+.btn.primary:hover{background:var(--plume-700)}
+.btn.ghost{background:transparent;border:1px solid var(--grey-300)}
+.btn.small{padding:5px 10px;font-size:12px}
+.err{color:#FF7A8F;font-size:13px;margin-top:10px;min-height:18px}
+/* shell */
+header{background:var(--ink);color:var(--refract);display:flex;align-items:center;gap:14px;padding:10px 18px;position:sticky;top:0;z-index:5;flex-wrap:wrap}
+.logo{font-weight:800;letter-spacing:-.01em;font-size:16px}.logo span{color:var(--plume-300)}
+header select{background:var(--ink-800);color:var(--refract);border:1px solid var(--ink-700);border-radius:8px;padding:6px 10px}
+nav{display:flex;gap:4px;flex-wrap:wrap}
+nav button{background:transparent;color:var(--grey-400);border:0;padding:7px 11px;border-radius:7px;cursor:pointer;font-weight:600}
+nav button.on{background:var(--ink-800);color:var(--refract)}
+.who{margin-left:auto;display:flex;align-items:center;gap:10px;color:var(--grey-400);font-size:13px}
+main{padding:18px;max-width:1500px;margin:0 auto}
+h2{margin:0 0 4px;font-size:20px}.sub{color:var(--grey-600);margin:0 0 14px}
+/* board */
+.filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.chip{border:1px solid var(--grey-300);background:var(--grey-100);border-radius:999px;padding:4px 11px;cursor:pointer;font-size:12px;font-weight:600}
+.chip.on{background:var(--ink);color:var(--refract);border-color:var(--ink)}
+.board{display:grid;grid-template-columns:repeat(5,minmax(230px,1fr));gap:12px;overflow-x:auto;padding-bottom:8px}
+.col{background:var(--grey-100);border:1px solid var(--grey-200);border-radius:12px;padding:10px;min-height:120px}
+.col h3{margin:0 0 8px;font-size:13px;display:flex;justify-content:space-between;color:var(--grey-600);text-transform:uppercase;letter-spacing:.04em}
+.card{background:var(--refract);border:1px solid var(--grey-200);border-radius:10px;padding:10px;margin-bottom:8px;cursor:pointer;transition:box-shadow .15s}
+.card:hover{box-shadow:0 2px 10px rgba(14,10,30,.12)}
+.card .top{display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap}
+.ref{font-weight:800;background:var(--ink);color:var(--refract);border-radius:5px;padding:0 6px;font-size:12px}
+.pri{font-weight:800;font-size:11px;border-radius:5px;padding:0 6px}
+.P1{background:#FBE3E8;color:var(--loss)}.P2{background:#F6ECD9;color:var(--warn)}.P3{background:var(--grey-200);color:var(--grey-600)}
+.lane{font-size:11px;font-weight:700;border-radius:5px;padding:0 6px;background:var(--plume-100);color:var(--plume-700)}
+.lane.seller_central{background:#E2EEF9;color:#245C8F}.lane.decision{background:#FFF1D6;color:var(--warn)}.lane.watch{background:var(--grey-200);color:var(--grey-600)}
+.card .t{font-weight:700;margin-bottom:6px}
+.meta{display:flex;justify-content:space-between;font-size:12px;color:var(--grey-600);gap:6px}
+.late{color:var(--loss);font-weight:700}
+.av{display:inline-flex;align-items:center;gap:5px}
+.dot{width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:var(--refract);background:var(--ink-700)}
+.dot.agent{background:var(--plume-600)}
+.verdict-tag{font-size:11px;font-weight:700;color:var(--gain)}
+/* drawer */
+#drawer{position:fixed;top:0;right:0;height:100vh;width:min(620px,100vw);background:var(--refract);border-left:1px solid var(--grey-300);box-shadow:-8px 0 30px rgba(14,10,30,.18);z-index:20;overflow-y:auto;padding:20px}
+#scrim{position:fixed;inset:0;background:rgba(14,10,30,.35);z-index:15}
+.dh{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.dh h2{font-size:18px}
+.box{background:var(--grey-100);border:1px solid var(--grey-200);border-radius:10px;padding:12px;margin:10px 0}
+.box h4{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--grey-600)}
+.box ol,.box ul{margin:4px 0 0 18px;padding:0}
+.ev{font-size:12px;font-family:ui-monospace,Menlo,monospace;color:var(--grey-600);word-break:break-word}
+.vbtns{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0}
+.vbtns button{border:1px solid var(--grey-300);background:var(--refract);border-radius:8px;padding:8px 4px;font-weight:700;cursor:pointer;font-size:12px}
+.vbtns button.on{background:var(--ink);color:var(--refract);border-color:var(--ink)}
+textarea,input[type=text],input[type=date],select.f{width:100%;padding:8px 10px;border:1px solid var(--grey-300);border-radius:8px;background:var(--refract)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tl{border-left:2px solid var(--grey-200);margin:8px 0 0 6px;padding-left:12px}
+.tl .it{margin-bottom:10px;font-size:13px}.tl .it .h{color:var(--grey-600);font-size:12px}
+.rec{background:var(--plume-100);border-left:3px solid var(--plume-600);padding:8px 10px;border-radius:6px;margin-top:6px}
+/* brand */
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin:10px 0 16px}
+.tile{background:var(--grey-100);border:1px solid var(--grey-200);border-radius:10px;padding:10px;cursor:pointer}
+.tile.on{outline:2px solid var(--plume-600)}
+.tile .m{font-weight:800}.tile .s{font-size:22px;font-weight:800}.tile .x{font-size:12px;color:var(--grey-600)}
+.g{display:inline-block;min-width:22px;text-align:center;border-radius:5px;font-weight:800;color:var(--refract);padding:0 5px}
+.gA{background:var(--gain)}.gB{background:#3E7C6A}.gC{background:var(--warn)}.gD{background:#B4572E}.gF{background:var(--loss)}
+table{width:100%;border-collapse:collapse;background:var(--grey-100);border-radius:10px;overflow:hidden}
+th{background:var(--ink);color:var(--refract);text-align:left;font-size:12px;padding:7px 8px}
+td{padding:6px 8px;border-top:1px solid var(--grey-200);vertical-align:top;font-size:13px}
+.tw{overflow-x:auto}
+.empty{color:var(--grey-600);padding:20px;text-align:center}
+@media (max-width:760px){main{padding:12px}.board{grid-template-columns:repeat(5,82vw)}.vbtns{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<div id="login">
+  <form class="login-card" id="loginForm">
+    <h1>Seller<span style="color:var(--plume-300)">Soar</span> OS</h1>
+    <p>Tasks that people and agents work together. Team only.</p>
+    <label>Email</label><input id="em" type="email" autocomplete="username" required>
+    <label>Password</label><input id="pw" type="password" autocomplete="current-password" required>
+    <div style="margin-top:16px"><button class="btn primary" style="width:100%">Sign in</button></div>
+    <div class="err" id="lerr"></div>
+  </form>
+</div>
+
+<div id="pwchange" class="hidden" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--ink);padding:16px">
+  <form class="login-card" id="pwForm">
+    <h1>Set your password</h1><p>You signed in with a temporary password. Choose your own (10+ characters).</p>
+    <label>New password</label><input id="np" type="password" minlength="10" autocomplete="new-password" required>
+    <div style="margin-top:16px"><button class="btn primary" style="width:100%">Save</button></div>
+    <div class="err" id="perr"></div>
+  </form>
+</div>
+
+<div id="app" class="hidden">
+  <header>
+    <div class="logo">Seller<span>Soar</span> OS</div>
+    <select id="brand"></select>
+    <nav id="nav">
+      <button data-v="board" class="on">Work</button>
+      <button data-v="health">Listing health</button>
+      <button data-v="decisions">Decisions</button>
+      <button data-v="activity">Activity</button>
+    </nav>
+    <div class="who"><span id="me"></span><button class="btn small ghost" style="color:var(--refract);border-color:var(--ink-700)" id="out">Sign out</button></div>
+  </header>
+  <main id="view"></main>
+</div>
+<div id="scrim" class="hidden"></div>
+<div id="drawer" class="hidden"></div>
+
+<script>
+const SB = supabase.createClient("https://zaxjtxotevgblzfnxeqa.supabase.co", "sb_publishable_jdcX4kuGmuoDwfIqre9jXg_PteieiUW");
+const S = {me:null, people:{}, brand:null, view:"board", tasks:[], filter:"all", market:null};
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const COLS = [["review","Needs a verdict"],["approved","To do"],["in_progress","In progress"],["verify","Verify"],["done","Done"]];
+const LANE = {agent:"Agent", seller_central:"Seller Central", decision:"Decision", watch:"Watch"};
+const VERDICT = {fix:"Fix", de_escalate:"De-escalate", dismiss:"Dismiss", hold:"Hold"};
+const VSTATUS = {fix:"approved", de_escalate:"dismissed", dismiss:"dismissed", hold:"held"};
+const today = () => new Date().toISOString().slice(0,10);
+const fmtD = d => d ? new Date(d+(d.length===10?"T00:00:00":"")).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"}) : "";
+const fmtT = t => new Date(t).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});
+const initials = n => (n||"?").split(" ").map(x=>x[0]).join("").slice(0,2).toUpperCase();
+const who = id => { const p = S.people[id]; if(!p) return `<span class="av"><span class="dot">?</span></span>`;
+  return `<span class="av"><span class="dot ${p.kind}">${p.kind==="agent"?"AI":initials(p.name)}</span>${esc(p.name)}</span>`; };
+
+// ------------------------------------------------------------------ auth
+$("#loginForm").onsubmit = async e => {
+  e.preventDefault(); $("#lerr").textContent = "";
+  const {error} = await SB.auth.signInWithPassword({email: $("#em").value.trim(), password: $("#pw").value});
+  if (error) { $("#lerr").textContent = error.message; return; }
+  boot();
+};
+$("#pwForm").onsubmit = async e => {
+  e.preventDefault(); $("#perr").textContent = "";
+  const {error} = await SB.auth.updateUser({password: $("#np").value});
+  if (error) { $("#perr").textContent = error.message; return; }
+  await SB.from("os_people").update({must_change_password:false}).eq("id", S.me.id);
+  $("#pwchange").classList.add("hidden"); start();
+};
+$("#out").onclick = async () => { await SB.auth.signOut(); location.reload(); };
+
+async function boot() {
+  const {data:{session}} = await SB.auth.getSession();
+  if (!session) { $("#login").classList.remove("hidden"); return; }
+  const {data:people} = await SB.from("os_people").select("*");
+  (people||[]).forEach(p => S.people[p.id] = p);
+  S.me = (people||[]).find(p => p.auth_user_id === session.user.id);
+  $("#login").classList.add("hidden");
+  if (!S.me) { $("#login").classList.remove("hidden"); $("#lerr").textContent = "This login is not on the team list."; await SB.auth.signOut(); return; }
+  if (S.me.must_change_password) { $("#pwchange").classList.remove("hidden"); return; }
+  start();
+}
+
+async function start() {
+  $("#app").classList.remove("hidden");
+  $("#me").textContent = S.me.name + (S.me.kind === "agent" ? " (agent)" : "");
+  const {data:brands} = await SB.from("os_brands").select("*").neq("status","test").order("id");
+  $("#brand").innerHTML = (brands||[]).map(b => `<option value="${esc(b.id)}">${esc(b.name)}</option>`).join("");
+  S.brand = (brands||[])[0]?.id;
+  $("#brand").onchange = () => { S.brand = $("#brand").value; S.market = null; render(); };
+  document.querySelectorAll("#nav button").forEach(b => b.onclick = () => {
+    document.querySelectorAll("#nav button").forEach(x => x.classList.toggle("on", x === b)); S.view = b.dataset.v; render(); });
+  render();
+  setInterval(() => { if ($("#drawer").classList.contains("hidden") && S.view === "board") render(); }, 30000);
+}
+
+function render() { ({board, health, decisions, activity})[S.view](); }
+
+// ------------------------------------------------------------------ board
+async function board() {
+  const {data:tasks} = await SB.from("os_tasks").select("*").eq("brand_id", S.brand).order("priority").order("ref");
+  S.tasks = tasks || [];
+  const mine = t => t.assignee === S.me.id;
+  const isAgent = t => S.people[t.assignee]?.kind === "agent";
+  const F = {all:()=>true, mine, agents:isAgent, people:t=>!isAgent(t), p1:t=>t.priority==="P1", decision:t=>t.lane==="decision"};
+  const list = S.tasks.filter(F[S.filter]);
+  const needs = S.tasks.filter(t => t.status === "review").length;
+  const parked = list.filter(t => t.status === "held" || t.status === "dismissed");
+  $("#view").innerHTML = `
+    <h2>Work</h2><p class="sub">${needs} waiting for a verdict. Nothing is worked, carded or pushed until a person gives it one.</p>
+    <div class="filters">${[["all","All"],["mine","Mine"],["agents","Agents"],["people","People"],["p1","P1"],["decision","Decisions"]]
+      .map(([k,l]) => `<span class="chip ${S.filter===k?"on":""}" data-f="${k}">${l}</span>`).join("")}</div>
+    <div class="board">${COLS.map(([st,label]) => { const c = list.filter(t => t.status === st);
+      return `<div class="col"><h3><span>${label}</span><span>${c.length}</span></h3>${c.map(card).join("") || `<div class="empty">Nothing here</div>`}</div>`; }).join("")}</div>
+    ${parked.length ? `<h3 style="margin:18px 0 8px;font-size:13px;color:var(--grey-600)">HELD OR DISMISSED (${parked.length})</h3><div class="board" style="grid-template-columns:repeat(auto-fill,minmax(230px,1fr))">${parked.map(card).join("")}</div>` : ""}`;
+  document.querySelectorAll(".chip").forEach(c => c.onclick = () => { S.filter = c.dataset.f; board(); });
+  document.querySelectorAll(".card").forEach(c => c.onclick = () => openTask(c.dataset.id));
+}
+function card(t) {
+  const late = t.due_date && t.due_date < today() && !["done","dismissed"].includes(t.status);
+  return `<div class="card" data-id="${t.id}">
+    <div class="top"><span class="ref">${esc(t.ref||"")}</span><span class="pri ${t.priority}">${t.priority}</span><span class="lane ${t.lane}">${LANE[t.lane]}</span>
+    ${t.verdict ? `<span class="verdict-tag">✓ ${VERDICT[t.verdict]}</span>` : ""}</div>
+    <div class="t">${esc(t.title)}</div>
+    <div class="meta">${who(t.assignee)}<span class="${late?"late":""}">${fmtD(t.due_date)}</span></div>
+    <div class="meta" style="margin-top:4px"><span>${esc((t.markets||[]).join(", "))}</span></div></div>`;
+}
+
+// ------------------------------------------------------------------ task drawer
+async function openTask(id) {
+  const t = S.tasks.find(x => x.id === id) || (await SB.from("os_tasks").select("*").eq("id", id).single()).data;
+  const {data:ev} = await SB.from("os_events").select("*").eq("task_id", id).order("created_at", {ascending:false});
+  const p = t.fix_plan || {};
+  const human = S.me.kind === "human";
+  const people = Object.values(S.people).filter(x => (x.active && x.role !== "Test only, disabled after checks") || x.id === t.assignee);
+  $("#drawer").innerHTML = `
+    <div class="dh"><div><div class="top row" style="margin-bottom:6px"><span class="ref">${esc(t.ref)}</span><span class="pri ${t.priority}">${t.priority}</span><span class="lane ${t.lane}">${LANE[t.lane]}</span><span class="sub" style="margin:0">${esc((t.markets||[]).join(", "))}</span></div>
+      <h2>${esc(t.title)}</h2></div><button class="btn small ghost" id="x">Close</button></div>
+    <p>${esc(t.detail)}</p>
+    ${p.question ? `<div class="box"><h4>Decision needed</h4><div>${esc(p.question)}</div><div class="rec"><b>Recommendation:</b> ${esc(p.recommendation)}</div></div>` : ""}
+    ${p.how || p.steps ? `<div class="box"><h4>How it gets done ${p.tool?`· ${esc(p.tool)}`:""} ${p.proven===false?`· <span style="color:var(--warn)">not proven yet, preview first</span>`:""}</h4>
+      ${p.how?`<div>${esc(p.how)}</div>`:""}${p.steps?`<ol>${p.steps.map(s=>`<li>${esc(s)}</li>`).join("")}</ol>`:""}
+      ${p.needs?`<div class="rec"><b>Needs first:</b> ${esc(p.needs)}</div>`:""}</div>` : ""}
+    ${(t.evidence||[]).length ? `<div class="box"><h4>Evidence (market : ASIN : check)</h4><div class="ev">${t.evidence.map(esc).join(" · ")}</div></div>` : ""}
+    <div class="box"><h4>Verdict</h4>
+      ${t.verdict ? `<div><b>${VERDICT[t.verdict]}</b> by ${who(t.verdict_by)} · ${fmtT(t.verdict_at)}<br>${esc(t.verdict_reason)}</div>` : `<div class="sub" style="margin:0">No verdict yet.</div>`}
+      ${human ? `<div class="vbtns">${Object.entries(VERDICT).map(([k,l]) => `<button data-vd="${k}">${l}</button>`).join("")}</div>
+      <textarea id="vr" rows="2" placeholder="Reason (required). Kept as brand knowledge."></textarea>
+      <div class="row" style="margin-top:6px"><label class="row" style="gap:5px;font-size:13px"><input type="checkbox" id="asdec" ${t.lane==="decision"?"checked":""}> Record as a brand decision</label>
+      <span style="font-size:13px">Recheck on</span><input type="date" id="rc" style="width:auto"></div>
+      ${t.lane==="decision"?`<input type="text" id="dtext" placeholder="The decision, in one line (defaults to the recommendation)" style="margin-top:6px">`:""}
+      <div style="margin-top:8px"><button class="btn primary small" id="saveV">Save verdict</button> <span class="err" id="verr"></span></div>`
+      : `<div class="sub" style="margin:6px 0 0">Agents cannot give verdicts. A person decides here.</div>`}
+    </div>
+    <div class="box"><h4>Work</h4>
+      <div class="row"><select class="f" id="st" style="width:auto">${[...COLS,["held","Held"],["dismissed","Dismissed"]].map(([k,l]) => `<option value="${k}" ${t.status===k?"selected":""}>${l}</option>`).join("")}</select>
+      <select class="f" id="as" style="width:auto">${people.map(x => `<option value="${x.id}" ${t.assignee===x.id?"selected":""}>${esc(x.name)}${x.kind==="agent"?" (agent)":""}</option>`).join("")}</select>
+      <input type="date" id="dd" value="${t.due_date||""}" style="width:auto"><button class="btn small" id="saveW">Update</button></div>
+      <div class="err" id="werr"></div>
+      <textarea id="cm" rows="2" placeholder="Add a note: what you did, what you found, why" style="margin-top:8px"></textarea>
+      <div style="margin-top:6px"><button class="btn small" id="saveC">Add note</button></div></div>
+    <h4 style="margin:14px 0 0;font-size:12px;text-transform:uppercase;color:var(--grey-600)">Activity</h4>
+    <div class="tl">${(ev||[]).map(e => `<div class="it"><div class="h">${who(e.actor)} · ${esc(e.kind)} · ${fmtT(e.created_at)}</div><div>${esc(e.body)}</div></div>`).join("") || `<div class="sub">No activity yet.</div>`}</div>`;
+  $("#drawer").classList.remove("hidden"); $("#scrim").classList.remove("hidden");
+  $("#x").onclick = closeDrawer;
+  let pick = null;
+  document.querySelectorAll("[data-vd]").forEach(b => b.onclick = () => { pick = b.dataset.vd;
+    document.querySelectorAll("[data-vd]").forEach(x => x.classList.toggle("on", x === b));
+    if (pick === "de_escalate") $("#asdec").checked = true; });
+  if ($("#saveV")) $("#saveV").onclick = async () => {
+    const reason = $("#vr").value.trim();
+    if (!pick) return $("#verr").textContent = "Pick a verdict.";
+    if (reason.length < 5) return $("#verr").textContent = "Give a reason (it is kept as brand knowledge).";
+    const {data:saved, error} = await SB.from("os_tasks").update({verdict:pick, verdict_reason:reason, verdict_by:S.me.id, updated_by:S.me.id,
+      status: t.status === "review" || t.status === "held" ? VSTATUS[pick] : t.status}).eq("id", t.id).select("id");
+    if (error) return $("#verr").textContent = error.message;
+    if (!saved || !saved.length) return $("#verr").textContent = "Not saved: you may not have access to this task.";
+    if ($("#asdec").checked) {
+      const d = ($("#dtext") && $("#dtext").value.trim()) || (p.question ? p.recommendation : `${VERDICT[pick]}: ${t.title}`);
+      const {error:e2} = await SB.from("os_decisions").insert({brand_id:t.brand_id, task_id:t.id, topic:t.title, decision:d, reason,
+        decided_by:S.me.id, recheck_on: $("#rc").value || null, source_ref:`OS task ${t.ref}`});
+      if (e2) return $("#verr").textContent = e2.message;
+    }
+    closeDrawer(); await board();
+  };
+  $("#saveW").onclick = async () => {
+    const {data:saved, error} = await SB.from("os_tasks").update({status:$("#st").value, assignee:$("#as").value, due_date:$("#dd").value||null, updated_by:S.me.id}).eq("id", t.id).select("id");
+    if (error) return $("#werr").textContent = error.message;
+    if (!saved || !saved.length) return $("#werr").textContent = "Not saved: you may not have access to this task.";
+    closeDrawer(); await board();
+  };
+  $("#saveC").onclick = async () => {
+    const body = $("#cm").value.trim(); if (!body) return;
+    const {error} = await SB.from("os_events").insert({task_id:t.id, brand_id:t.brand_id, actor:S.me.id, kind:"comment", body});
+    if (error) return $("#werr").textContent = error.message;
+    openTask(t.id);
+  };
+}
+function closeDrawer() { $("#drawer").classList.add("hidden"); $("#scrim").classList.add("hidden"); }
+$("#scrim").onclick = closeDrawer;
+
+// ------------------------------------------------------------------ listing health
+async function health() {
+  const {data:runs} = await SB.from("os_runs").select("*").eq("brand_id", S.brand).eq("kind","listing_health").order("run_date",{ascending:false});
+  const run = (runs||[])[0];
+  if (!run) { $("#view").innerHTML = `<h2>Listing health</h2><div class="empty">No audit published for this brand yet.</div>`; return; }
+  const [{data:sc},{data:rows}] = await Promise.all([
+    SB.from("os_market_scores").select("*").eq("run_id", run.id),
+    SB.from("os_listing_rows").select("*").eq("run_id", run.id).order("tier").order("score")]);
+  const order = ["UK","DE","FR","IT","ES","NL","BE","SE","PL","IE"];
+  (sc||[]).sort((a,b) => order.indexOf(a.market) - order.indexOf(b.market));
+  const shown = (rows||[]).filter(r => !S.market || r.market === S.market);
+  $("#view").innerHTML = `
+    <h2>Listing health</h2><p class="sub">${esc(run.title)} · ${fmtD(run.run_date)} · ${run.summary?.listings ?? ""} listings, ${run.summary?.hard ?? ""} hard faults${runs.length>1?` · ${runs.length} runs on file`:""}</p>
+    <div class="tiles">${(sc||[]).map(s => `<div class="tile ${S.market===s.market?"on":""}" data-m="${s.market}"><div class="m">${s.market} <span class="g g${s.grade}">${s.grade}</span></div><div class="s">${s.score}</div><div class="x">${s.rows} listings · ${s.hard} hard</div></div>`).join("")}</div>
+    <p class="sub">${S.market ? `Showing ${S.market}. <a href="#" id="clr">Show all markets</a>` : "Click a market to filter."}</p>
+    <div class="tw"><table><tr><th>Mkt</th><th>Tier</th><th>Product</th><th>ASIN / SKU</th><th>Score</th><th>Grade</th><th>Hard faults, or the biggest point losses</th></tr>
+    ${shown.map(r => { const f = Object.entries(r.checks?.fails||{}).sort((a,b) => (b[1][1]-b[1][0])-(a[1][1]-a[1][0])).slice(0,3);
+      return `<tr><td>${r.market}</td><td>T${r.tier}</td><td>${esc(r.label)}</td><td style="font-size:12px">${r.asin}<br>${esc(r.sku||"no SKU")}</td><td>${r.score}</td><td><span class="g g${r.grade}">${r.grade}</span></td>
+      <td>${r.hard?.length ? `<b>${esc(r.hard.join("; "))}</b>` : esc(f.map(([k,v]) => `${k} ${v[2]}`).join("; ") || "clean")}</td></tr>`; }).join("")}</table></div>`;
+  document.querySelectorAll(".tile").forEach(t => t.onclick = () => { S.market = S.market === t.dataset.m ? null : t.dataset.m; health(); });
+  if ($("#clr")) $("#clr").onclick = e => { e.preventDefault(); S.market = null; health(); };
+}
+
+// ------------------------------------------------------------------ decisions and activity
+async function decisions() {
+  const {data} = await SB.from("os_decisions").select("*").eq("brand_id", S.brand).is("superseded_by", null).order("decided_at",{ascending:false});
+  $("#view").innerHTML = `<h2>Decisions</h2><p class="sub">The brand's standing decisions and why. Agents read these before every run. New ones are recorded from a verdict.</p>
+    <div class="tw"><table><tr><th>Topic</th><th>Decision</th><th>Why</th><th>By</th><th>When</th><th>Source</th><th>Recheck</th></tr>
+    ${(data||[]).map(d => `<tr><td><b>${esc(d.topic)}</b></td><td>${esc(d.decision)}</td><td>${esc(d.reason)}</td><td>${who(d.decided_by)}</td><td>${fmtT(d.decided_at)}</td><td style="font-size:12px">${esc(d.source_ref||"")}</td><td>${fmtD(d.recheck_on)}</td></tr>`).join("") || `<tr><td colspan="7" class="empty">No decisions yet.</td></tr>`}</table></div>`;
+}
+async function activity() {
+  const [{data}, {data:tasks}] = await Promise.all([
+    SB.from("os_events").select("*").eq("brand_id", S.brand).order("created_at",{ascending:false}).limit(150),
+    SB.from("os_tasks").select("id,ref,title").eq("brand_id", S.brand)]);
+  const T = Object.fromEntries((tasks||[]).map(t => [t.id, t]));
+  $("#view").innerHTML = `<h2>Activity</h2><p class="sub">Everything people and agents did, newest first. Append-only.</p>
+    <div class="tl">${(data||[]).map(e => `<div class="it"><div class="h">${who(e.actor)} · ${esc(e.kind)} · ${fmtT(e.created_at)}${e.task_id&&T[e.task_id]?` · <a href="#" data-t="${e.task_id}">${esc(T[e.task_id].ref)} ${esc(T[e.task_id].title)}</a>`:""}</div><div>${esc(e.body)}</div></div>`).join("") || `<div class="empty">No activity yet.</div>`}</div>`;
+  document.querySelectorAll("[data-t]").forEach(a => a.onclick = async ev => { ev.preventDefault();
+    const {data:t} = await SB.from("os_tasks").select("*").eq("brand_id", S.brand); S.tasks = t||[]; openTask(a.dataset.t); });
+}
+
+boot();
+</script>
+</body>
+</html>

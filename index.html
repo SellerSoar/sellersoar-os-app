@@ -306,7 +306,7 @@ $("#scrim").onclick = closeDrawer;
 
 // ------------------------------------------------------------------ listing health
 async function health() {
-  const {data:runs} = await SB.from("os_runs").select("*").eq("brand_id", S.brand).eq("kind","listing_health").order("run_date",{ascending:false});
+  const {data:runs} = await SB.from("os_runs").select("*").eq("brand_id", S.brand).eq("kind","listing_health").in("status",["done","review"]).order("run_date",{ascending:false}).order("created_at",{ascending:false});
   const run = (runs||[])[0];
   if (!run) { $("#view").innerHTML = `<h2>Listing health</h2><div class="empty">No audit published for this brand yet.</div>`; return; }
   const [{data:sc},{data:rows}] = await Promise.all([
@@ -320,8 +320,8 @@ async function health() {
     <div class="tiles">${(sc||[]).map(s => `<div class="tile ${S.market===s.market?"on":""}" data-m="${s.market}"><div class="m">${s.market} <span class="g g${s.grade}">${s.grade}</span></div><div class="s">${s.score}</div><div class="x">${s.rows} listings · ${s.hard} hard</div></div>`).join("")}</div>
     <p class="sub">${S.market ? `Showing ${S.market}. <a href="#" id="clr">Show all markets</a>` : "Click a market to filter."}</p>
     <div class="tw"><table><tr><th>Mkt</th><th>Tier</th><th>Product</th><th>ASIN / SKU</th><th>Score</th><th>Grade</th><th>Hard faults, or the biggest point losses</th></tr>
-    ${shown.map(r => { const f = Object.entries(r.checks?.fails||{}).sort((a,b) => (b[1][1]-b[1][0])-(a[1][1]-a[1][0])).slice(0,3);
-      return `<tr><td>${r.market}</td><td>T${r.tier}</td><td>${esc(r.label)}</td><td style="font-size:12px">${r.asin}<br>${esc(r.sku||"no SKU")}</td><td>${r.score}</td><td><span class="g g${r.grade}">${r.grade}</span></td>
+    ${shown.map(r => { const st = r.stale ? ` <span class="sub" title="page read reused from an earlier day">(stale read)</span>` : ""; const f = Object.entries(r.checks?.fails||{}).sort((a,b) => (b[1][1]-b[1][0])-(a[1][1]-a[1][0])).slice(0,3);
+      return `<tr><td>${r.market}</td><td>T${r.tier}</td><td>${esc(r.label)}${st}</td><td style="font-size:12px">${r.asin}<br>${esc(r.sku||"no SKU")}</td><td>${r.score}</td><td><span class="g g${r.grade}">${r.grade}</span></td>
       <td>${r.hard?.length ? `<b>${esc(r.hard.join("; "))}</b>` : esc(f.map(([k,v]) => `${k} ${v[2]}`).join("; ") || "clean")}</td></tr>`; }).join("")}</table></div>`;
   document.querySelectorAll(".tile").forEach(t => t.onclick = () => { S.market = S.market === t.dataset.m ? null : t.dataset.m; health(); });
   if ($("#clr")) $("#clr").onclick = e => { e.preventDefault(); S.market = null; health(); };
